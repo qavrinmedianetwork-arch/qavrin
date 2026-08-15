@@ -1,196 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b46bc">
+  <meta name="description" content="QAVRIN — a place for Indian youth to share thoughts, ideas, opinions and perspectives.">
   <title>QAVRIN — Think. Write. Be heard.</title>
-  <meta name="description" content="QAVRIN is a place for Indian youth to share thoughts, ideas, opinions and perspectives." />
-  <link rel="icon" href="assets/official-logo.png" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="assets/qavrin-logo.png">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="toast" class="toast"></div>
+  <div id="app"></div>
+  <div id="toast" class="toast" aria-live="polite"></div>
 
-  <section id="authScreen" class="auth-screen">
-    <div class="auth-panel auth-brand">
-      <img src="assets/official-logo.png" class="auth-logo" alt="QAVRIN official logo" />
-      <p class="eyebrow">A SPACE FOR INDIAN YOUTH</p>
-      <h1>Your thoughts deserve a place.</h1>
-      <p class="lead">
-        QAVRIN is built for people who want to write what they really think,
-        discover new perspectives and take part in meaningful conversations.
-      </p>
-      <div class="auth-points">
-        <div><strong>Write freely</strong><span>Share thoughts without forcing everything into a short video.</span></div>
-        <div><strong>Read different views</strong><span>Find conversations across education, society, careers, campus and more.</span></div>
-        <div><strong>Build your voice</strong><span>Start with your words. Your profile grows from your ideas.</span></div>
-      </div>
-    </div>
-
-    <div class="auth-panel auth-card-wrap">
-      <div class="auth-card">
-        <div class="trial-badge">TRIAL VERSION</div>
-        <div class="auth-tabs">
-          <button class="auth-tab active" data-auth-tab="login">Log in</button>
-          <button class="auth-tab" data-auth-tab="signup">Create account</button>
-        </div>
-
-        <form id="loginForm" class="auth-form">
-          <h2>Welcome back.</h2>
-          <p class="muted">Log in to continue writing on QAVRIN.</p>
-
-          <label>Email
-            <input id="loginEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
-          </label>
-          <label>Password
-            <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Your password" />
-          </label>
-          <button class="primary-btn full" type="submit">Log in</button>
-          <button class="link-btn" type="button" id="demoLogin">Use demo account</button>
-        </form>
-
-        <form id="signupForm" class="auth-form hidden">
-          <h2>Create your QAVRIN account.</h2>
-          <p class="muted">No avatar. No clutter. Just your identity and your words.</p>
-
-          <label>Full name
-            <input id="signupName" type="text" maxlength="50" required placeholder="Your name" />
-          </label>
-          <label>Username
-            <input id="signupUsername" type="text" maxlength="24" pattern="[A-Za-z0-9_]+" required placeholder="yourusername" />
-          </label>
-          <label>Email
-            <input id="signupEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
-          </label>
-          <label>Password
-            <input id="signupPassword" type="password" minlength="6" autocomplete="new-password" required placeholder="At least 6 characters" />
-          </label>
-          <button class="primary-btn full" type="submit">Create account</button>
-        </form>
-
-        <p class="auth-note">
-          Trial build: accounts and posts are stored only in this browser.
-          This is not production authentication yet.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section id="appScreen" class="app-screen hidden">
-    <header class="topbar">
-      <div class="brand">
-        <img src="assets/official-logo.png" alt="QAVRIN" class="brand-logo" />
-      </div>
-      <div class="top-actions">
-        <button class="ghost-btn" id="newPostTop">Write</button>
-        <button class="ghost-btn" id="logoutBtn">Log out</button>
-      </div>
-    </header>
-
-    <div class="trial-strip">
-      <span>QAVRIN TRIAL</span>
-      <span>This build is for testing the product idea. Real shared accounts need a backend.</span>
-    </div>
-
-    <main class="app-main">
-      <section class="welcome-row">
-        <div>
-          <p class="eyebrow">YOUR SPACE</p>
-          <h1 id="welcomeTitle">Write what you think.</h1>
-          <p class="lead small">No avatar. No pressure. Just a place for your thoughts.</p>
-        </div>
-        <div class="user-chip">
-          <strong id="currentUserName">You</strong>
-          <span id="currentUserHandle">@you</span>
-        </div>
-      </section>
-
-      <section id="writer" class="writer-card">
-        <div class="writer-top">
-          <div>
-            <span class="mini-label">CREATE A POST</span>
-            <h2>What do you want to say?</h2>
-          </div>
-          <span id="charCount" class="char-count">0 / 1200</span>
-        </div>
-
-        <label>Title
-          <input id="postTitle" maxlength="100" placeholder="Give your thought a clear title" />
-        </label>
-
-        <label>Your thought
-          <textarea id="postBody" maxlength="1200" rows="8" placeholder="Write it like you would say it to another person."></textarea>
-        </label>
-
-        <div class="writer-grid">
-          <label>Topic
-            <select id="postTopic">
-              <option value="General">General</option>
-              <option value="Education">Education</option>
-              <option value="Society">Society</option>
-              <option value="Campus">Campus</option>
-              <option value="Careers">Careers</option>
-              <option value="Technology">Technology</option>
-              <option value="India">India</option>
-              <option value="Debates">Debates</option>
-            </select>
-          </label>
-          <label>Tags
-            <input id="postTags" maxlength="100" placeholder="education, youth, india" />
-          </label>
-        </div>
-
-        <div class="writer-bottom">
-          <span class="muted">Be clear. Be respectful. Say something worth reading.</span>
-          <button class="primary-btn" id="publishBtn">Publish thought</button>
-        </div>
-      </section>
-
-      <section class="feed-head">
-        <div>
-          <p class="eyebrow">COMMUNITY</p>
-          <h2>What people are saying</h2>
-        </div>
-        <select id="feedFilter" class="filter-select">
-          <option value="latest">Latest</option>
-          <option value="popular">Popular</option>
-          <option value="mine">My posts</option>
-          <option value="Education">Education</option>
-          <option value="Society">Society</option>
-          <option value="Campus">Campus</option>
-          <option value="Careers">Careers</option>
-          <option value="Technology">Technology</option>
-          <option value="India">India</option>
-          <option value="Debates">Debates</option>
-        </select>
-      </section>
-
-      <section id="feed" class="feed" aria-live="polite"></section>
-    </main>
-
-    <footer class="site-footer">
-      <img src="assets/official-logo.png" alt="QAVRIN official logo" />
-      <div>
-        <strong>QAVRIN</strong>
-        <span>Think. Write. Be heard.</span>
-      </div>
-      <small>Trial version · Built for early testing</small>
-    </footer>
-  </section>
-
-  <dialog id="accountModal" class="modal">
-    <div class="modal-card">
-      <button class="close-btn" data-close="accountModal">×</button>
-      <h2>Your account</h2>
-      <p id="accountDetails" class="muted"></p>
-      <div class="account-stats">
-        <div><strong id="myPostCount">0</strong><span>Posts</span></div>
-        <div><strong id="myLikeCount">0</strong><span>Likes</span></div>
-      </div>
-      <button class="primary-btn full" data-close="accountModal">Close</button>
-    </div>
-  </dialog>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

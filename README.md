@@ -1,134 +1,250 @@
-# QAVRIN V2 — Trial Build
+# QAVRIN — Production Web Foundation
 
-This version replaces the original static demo with a simple account + writing flow.
+This package is the next step from the GitHub Pages prototype.
 
-## What is included
+It uses:
+- GitHub Pages for static hosting
+- Supabase Auth for real accounts
+- Supabase Postgres for shared data
+- Row Level Security (RLS) for browser-side authorization
 
-### Public entry
-- QAVRIN official logo supplied by the founder is used throughout the site.
-- Clear positioning: “Your thoughts deserve a place.”
-- Trial-version notice.
+The browser uses only the Supabase publishable/anon key. Never put a service-role/secret key into the repository.
 
-### Account flow
-- Create account with:
-  - Full name
-  - Username
-  - Email
-  - Password
-- Log in
-- Demo-account shortcut
-- Log out
-- Basic account summary
+## What is implemented
 
-### Writing flow
-- Create a post
-- Title
-- Long-form body
-- Topic
+### Public/authentication
+- QAVRIN branded sign-in screen
+- Account creation
+- Email/password login
+- Password reset
+- Persistent Supabase session
+- Profile creation on signup
+- Username validation
+- Logout
+
+### Core social product
+- Create posts
+- Long-form thoughts
+- Topics
 - Tags
-- Character counter
-- Publish
-- Delete your own post
-
-### Community flow
 - Latest feed
-- Popular feed
-- My posts
 - Topic filtering
+- Search
 - Likes
 - Comments
-- Simple comment list
+- Follow/unfollow
+- Public profiles
+- Profile editing
+- Post deletion by owner
+- Notifications in database for likes/comments/follows
+- Report flow
+- Community rules UI
+- Responsive mobile navigation
+- No avatar upload; initials are used for identity
 
-### Design choice
-No avatar system is included in this trial, as requested. The product identity is based on name, username and writing.
+### Security foundation
+- Postgres RLS
+- Owner-only writes
+- Safe profile update RPC that cannot modify `is_admin`
+- Admin report policy
+- Auth trigger for profile creation
+- Indexed user/post/comment/notification access paths
 
-## IMPORTANT: this is still a browser-only trial
+## Important: this is a production foundation, not a finished enterprise platform
 
-GitHub Pages is static hosting. It cannot safely provide real shared authentication and a shared database by itself.
+Before a public launch you still need:
+- moderation/admin dashboard
+- account deletion workflow
+- email/phone verification policy
+- anti-spam and rate limiting
+- abuse detection
+- blocked-user enforcement
+- privacy policy and terms
+- cookie/analytics consent where applicable
+- backups and recovery plan
+- error monitoring
+- performance monitoring
+- SEO/OG metadata
+- accessibility audit
+- security review
+- load testing
+- content moderation operations
+- data retention/deletion rules
+- age policy and child-safety review
+- legal review for India and any future markets
+- domain + HTTPS
+- custom transactional email templates
+- image/video storage only after the text product is stable
 
-In this build:
-- users are stored in the browser's localStorage
-- passwords are stored locally in plain text
-- posts exist only in that browser
-- another person on another phone/browser will NOT see the same accounts or posts
+## Setup
 
-This is deliberate for the trail/trial demonstration, but it is NOT suitable for production.
+### 1. Create Supabase project
+Open Supabase and create a project.
 
-## What the next real version needs
+Then open:
+Supabase Dashboard → SQL Editor
 
-Move the application backend to a real service such as Supabase and connect:
+Paste the complete contents of `supabase.sql` and run it.
 
-1. Authentication
-2. PostgreSQL database
-3. Server-side authorization
-4. Real user profiles
-5. Posts table
-6. Comments table
-7. Likes table
-8. Follows table
-9. Reports / moderation
-10. Image/video storage later
-11. Rate limiting and anti-spam
-12. Privacy policy, terms and community rules
+The SQL creates:
+- profiles
+- posts
+- comments
+- likes
+- follows
+- notifications
+- reports
+- indexes
+- RLS policies
+- signup trigger
+- safe profile-update RPC
+- notification triggers
 
-### Suggested database structure
+### 2. Configure Auth
 
-users / profiles
-- id
-- full_name
-- username
-- email
-- created_at
+In Supabase:
+Authentication → Providers → Email
 
-posts
-- id
-- user_id
-- title
-- body
-- topic
-- created_at
-- updated_at
+Choose the email-confirmation behaviour you want.
 
-comments
-- id
-- post_id
-- user_id
-- body
-- created_at
+For the first closed test, email/password is enough. Add Google/Apple later if users ask for it.
 
-likes
-- post_id
-- user_id
-- created_at
+Set the Site URL and redirect URL to your GitHub Pages URL, for example:
 
-## GitHub Pages deployment
+https://YOUR-USERNAME.github.io/qavrin/
 
-Upload the project contents to the `qavrin` repository.
+Use your exact repository URL.
 
-Then:
+### 3. Get browser-safe API credentials
 
-GitHub → Repository → Settings → Pages
+Supabase Dashboard → Project Settings → API.
 
-Choose:
+Copy:
+- Project URL
+- Publishable key (or anon key if your project still labels it that way)
 
+Paste them into `config.js`.
+
+Do NOT paste:
+- service_role
+- secret key
+- database password
+- connection string
+
+### 4. Upload to GitHub
+
+Replace the old:
+- index.html
+- styles.css
+- app.js
+
+Upload:
+- config.js
+- supabase.sql
+- README.md
+- assets/qavrin-logo.png
+
+Keep the repository root structure:
+
+qavrin/
+  index.html
+  styles.css
+  app.js
+  config.js
+  supabase.sql
+  README.md
+  assets/
+    qavrin-logo.png
+
+### 5. GitHub Pages
+
+Repository → Settings → Pages:
 - Source: Deploy from a branch
 - Branch: main
 - Folder: / (root)
 
-Save and wait for the Pages deployment.
+Save.
 
-## Suggested launch sequence
+### 6. Test with two accounts
 
-Do not add payments or ads yet.
+Do NOT test only with your own account.
 
-First test:
-- 10–20 people
-- 2–4 weeks
-- number of account creations
-- number of posts
-- posts per active user
-- comments per post
-- return users
-- reports / spam
+Create:
+- Account A
+- Account B
 
-Only after people are actually using it should the production backend and monetisation work begin.
+Check:
+1. A creates a post.
+2. B can see it.
+3. B comments.
+4. A sees the comment.
+5. B follows A.
+6. A can see follower count.
+7. B likes A's post.
+8. A can see the like.
+9. A deletes own post.
+10. B cannot delete A's post.
+11. A edits profile.
+12. Search finds posts.
+
+If any of those fail, fix the database/RLS before inviting more users.
+
+## Product launch order
+
+Do not add everything at once.
+
+Phase 1:
+- accounts
+- profiles
+- posts
+- comments
+- likes
+- follows
+- search
+- reports
+
+Phase 2:
+- notifications UI
+- moderation dashboard
+- blocked users
+- saved posts
+- better discovery
+- email templates
+
+Phase 3:
+- image upload
+- richer editor
+- mobile PWA/app
+- analytics
+- creator/community tools
+
+Phase 4:
+- monetisation
+
+Do not add ads or subscriptions before you have real usage data.
+
+## Architecture
+
+GitHub Pages
+    ↓
+QAVRIN browser app
+    ↓
+Supabase Auth
+    ↓
+Supabase Postgres + RLS
+    ↓
+notifications / moderation / future storage
+
+The browser is not trusted. The database policies are the security boundary.
+
+## Current brand direction
+
+QAVRIN is intentionally:
+- text-first
+- clean
+- youth-focused
+- India-focused
+- identity through name/username, not avatar pressure
+- conversation over vanity metrics
+
+The next major design decision should be the feed/discovery algorithm, not cosmetic features.
