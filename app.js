@@ -1,425 +1,64 @@
-(() => {
-  const cfg = window.QAVRIN_CONFIG || {};
-  const root = document.getElementById("app");
-  const toastEl = document.getElementById("toast");
-  let supabase = null;
-  let currentProfile = null;
-  let feedMode = "latest";
-  let searchTerm = "";
-
-  const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
-  const initials = name => (name || "?").trim().split(/\s+/).slice(0,2).map(x => x[0]).join("").toUpperCase();
-  const ago = ts => {
-    const m = Math.max(1, Math.floor((Date.now() - new Date(ts).getTime()) / 60000));
-    if(m < 60) return `${m}m`;
-    const h = Math.floor(m/60); if(h < 24) return `${h}h`;
-    const d = Math.floor(h/24); if(d < 30) return `${d}d`;
-    return new Date(ts).toLocaleDateString();
-  };
-  const toast = msg => { toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(window.__qt); window.__qt = setTimeout(()=>toastEl.classList.remove("show"),2200); };
-  const isConfigured = () => cfg.SUPABASE_URL && !cfg.SUPABASE_URL.includes("PASTE_") && cfg.SUPABASE_KEY && !cfg.SUPABASE_KEY.includes("PASTE_");
-
-  async function init(){
-    if(!isConfigured()){ renderSetup(); return; }
-    supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY, {
-      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
-    });
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      if(session?.user){ await loadProfile(session.user.id); renderApp(); }
-      else { currentProfile = null; renderAuth(); }
-    });
-    const { data:{session} } = await supabase.auth.getSession();
-    if(session?.user){ await loadProfile(session.user.id); renderApp(); }
-    else renderAuth();
-  }
-
-  function renderSetup(){
-    root.innerHTML = `
-      <main class="auth-page">
-        <section class="auth-card">
-          <img class="logo" src="assets/qavrin-logo.png" alt="QAVRIN">
-          <p class="eyebrow">QAVRIN SETUP</p>
-          <h1 style="font-size:34px;margin:0 0 10px">Connect the real backend.</h1>
-          <p class="lead" style="font-size:14px">The frontend is ready. Add your Supabase Project URL and publishable key in <code>config.js</code>, run <code>supabase.sql</code> once in Supabase SQL Editor, then redeploy.</p>
-          <div class="feature" style="margin:18px 0">
-            <strong>Do not put a service-role/secret key here.</strong>
-            <span>Only the browser-safe publishable/anon key belongs in <code>config.js</code>. Database security is enforced with RLS.</span>
-          </div>
-          <a class="primary full" style="display:block;text-align:center" href="https://supabase.com/" target="_blank" rel="noreferrer">Open Supabase</a>
-        </section>
-      </main>`;
-  }
-
-  function renderAuth(tab="login"){
-    root.innerHTML = `
-      <main class="auth-page">
-        <section class="auth-card">
-          <img class="logo" src="assets/qavrin-logo.png" alt="QAVRIN">
-          <p class="eyebrow">QAVRIN</p>
-          <h1 style="font-size:38px;margin:0">Your thoughts deserve a place.</h1>
-          <p class="lead" style="font-size:14px">Write clearly. Read different perspectives. Be part of the conversation.</p>
-          <div class="auth-tabs">
-            <button class="auth-tab ${tab==="login"?"active":""}" data-tab="login">Log in</button>
-            <button class="auth-tab ${tab==="signup"?"active":""}" data-tab="signup">Create account</button>
-          </div>
-          <div id="authForm"></div>
-          <p class="muted" style="font-size:11px;margin:16px 0 0">By joining QAVRIN, you agree to follow the community rules. Be respectful. Do not post illegal, hateful, threatening or deliberately harmful content.</p>
-        </section>
-      </main>`;
-    root.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>renderAuth(b.dataset.tab));
-    const box = document.getElementById("authForm");
-    if(tab==="login"){
-      box.innerHTML = `
-        <form class="form">
-          <h2>Welcome back.</h2>
-          <label class="field">Email<input name="email" type="email" required autocomplete="email"></label>
-          <label class="field">Password<input name="password" type="password" required autocomplete="current-password"></label>
-          <button class="primary full">Log in</button>
-          <button type="button" class="text-btn" id="forgot">Forgot password?</button>
-          <p class="note">Email confirmation and password reset are handled by Supabase Auth.</p>
-        </form>`;
-      box.querySelector("form").onsubmit=async e=>{
-        e.preventDefault(); const f=new FormData(e.currentTarget);
-        const {error}=await supabase.auth.signInWithPassword({email:f.get("email"),password:f.get("password")});
-        if(error) toast(error.message); else toast("Welcome back.");
-      };
-      box.querySelector("#forgot").onclick=async()=>{
-        const email=prompt("Enter your QAVRIN account email:");
-        if(!email) return;
-        const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.href});
-        toast(error ? error.message : "Password reset email sent.");
-      };
-    } else {
-      box.innerHTML = `
-        <form class="form">
-          <h2>Create your account.</h2>
-          <label class="field">Full name<input name="name" maxlength="60" required></label>
-          <label class="field">Username<input name="username" maxlength="24" pattern="[A-Za-z0-9_]+" required placeholder="yourusername"></label>
-          <label class="field">Email<input name="email" type="email" required autocomplete="email"></label>
-          <label class="field">Password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
-          <label class="field">Short bio <span class="muted" style="font-weight:500">(optional)</span><textarea name="bio" maxlength="160" rows="3"></textarea></label>
-          <button class="primary full">Create account</button>
-          <p class="note">Use a real email. Depending on your Supabase Auth settings, you may need to confirm it before logging in.</p>
-        </form>`;
-      box.querySelector("form").onsubmit=async e=>{
-        e.preventDefault(); const f=new FormData(e.currentTarget);
-        const username=String(f.get("username")).trim().toLowerCase();
-        if(!/^[a-z0-9_]{3,24}$/.test(username)) return toast("Username must be 3–24 letters, numbers or underscores.");
-        const {data,error}=await supabase.auth.signUp({
-          email:f.get("email"),password:f.get("password"),
-          options:{data:{full_name:String(f.get("name")).trim(),username,bio:String(f.get("bio")||"").trim()}}
-        });
-        if(error) return toast(error.message);
-        if(data.session) toast("Account created.");
-        else {
-          root.querySelector("#authForm").innerHTML=`<div class="verify-box">Account created. Check your email to confirm your QAVRIN account, then log in.</div>`;
-        }
-      };
-    }
-  }
-
-  async function loadProfile(userId){
-    const {data,error}=await supabase.from("profiles").select("*").eq("id",userId).single();
-    if(error){ console.error(error); toast("Could not load your profile."); return; }
-    currentProfile=data;
-  }
-
-  function shell(content, active="home"){
-    const p=currentProfile;
-    return `
-      <div class="app-shell">
-        <header class="topbar">
-          <a href="#" class="brand-link"><img class="logo" src="assets/qavrin-logo.png" alt="QAVRIN"></a>
-          <div class="top-search"><input id="searchInput" placeholder="Search people, posts and topics..." value="${escapeHtml(searchTerm)}"></div>
-          <div class="top-actions">
-            <button class="secondary" id="writeTop">Write</button>
-            <button class="user-button" id="userMenuBtn"><span class="avatar">${initials(p.full_name)}</span>${escapeHtml(p.username)} ▾</button>
-            <div class="menu hidden" id="userMenu">
-              <button id="profileMenu">My profile</button>
-              <button id="settingsMenu">Settings</button>
-              <button id="logoutMenu" class="danger">Log out</button>
-            </div>
-          </div>
-        </header>
-        <main class="page app-grid">
-          <aside class="sidebar">
-            <nav class="nav-card">
-              <button class="nav-item ${active==="home"?"active":""}" data-nav="home">⌂ Home</button>
-              <button class="nav-item ${active==="explore"?"active":""}" data-nav="explore">⌕ Explore</button>
-              <button class="nav-item ${active==="profile"?"active":""}" data-nav="profile">◯ My profile</button>
-              <button class="nav-item ${active==="settings"?"active":""}" data-nav="settings">⚙ Settings</button>
-            </nav>
-            <div class="side-card" style="margin-top:12px">
-              <h3>QAVRIN</h3>
-              <p>A place for Indian youth to share thoughts, ideas, opinions and perspectives.</p>
-              <p><strong>Think. Write. Be heard.</strong></p>
-            </div>
-          </aside>
-          <section>${content}</section>
-          <aside class="rightbar">
-            <div class="side-card">
-              <h3>Community rules</h3>
-              <p>Challenge ideas, not people. No threats, harassment, impersonation, spam or illegal content.</p>
-              <button class="text-btn" id="rulesBtn">Read full rules</button>
-            </div>
-            <div class="side-card" style="margin-top:12px">
-              <h3>Topics</h3>
-              <div style="display:grid;gap:5px">
-                ${["Education","Society","Campus","Careers","Technology","India","Debates"].map(t=>`<button class="text-btn topic-link" data-topic="${t}" style="text-align:left">#${t}</button>`).join("")}
-              </div>
-            </div>
-          </aside>
-        </main>
-        <footer class="page footer">
-          <div style="display:flex;align-items:center;gap:9px"><img src="assets/qavrin-logo.png" alt="QAVRIN"><span>QAVRIN</span></div>
-          <span>Community first · Privacy · Terms · Rules</span>
-        </footer>
-        <nav class="mobile-nav">
-          <button class="${active==="home"?"active":""}" data-nav="home">Home</button>
-          <button class="${active==="explore"?"active":""}" data-nav="explore">Explore</button>
-          <button data-nav="write">Write</button>
-          <button class="${active==="profile"?"active":""}" data-nav="profile">Profile</button>
-          <button class="${active==="settings"?"active":""}" data-nav="settings">Settings</button>
-        </nav>
-      </div>`;
-  }
-
-  function bindShell(){
-    root.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{
-      const n=b.dataset.nav;
-      if(n==="home") renderHome();
-      else if(n==="explore") renderExplore();
-      else if(n==="profile") renderProfile(currentProfile.username);
-      else if(n==="settings") renderSettings();
-      else if(n==="write"){ renderHome(); setTimeout(()=>document.getElementById("composerBody")?.focus(),50); }
-    });
-    root.querySelector("#writeTop")?.addEventListener("click",()=>{renderHome();setTimeout(()=>document.getElementById("composerBody")?.focus(),50)});
-    const mb=root.querySelector("#userMenuBtn"), menu=root.querySelector("#userMenu");
-    mb?.addEventListener("click",()=>menu.classList.toggle("hidden"));
-    root.querySelector("#logoutMenu")?.addEventListener("click",()=>supabase.auth.signOut());
-    root.querySelector("#profileMenu")?.addEventListener("click",()=>renderProfile(currentProfile.username));
-    root.querySelector("#settingsMenu")?.addEventListener("click",()=>renderSettings());
-    root.querySelector("#rulesBtn")?.addEventListener("click",showRules);
-    root.querySelectorAll(".topic-link").forEach(b=>b.onclick=()=>{searchTerm="";feedMode=b.dataset.topic;renderExplore()});
-    root.querySelector("#searchInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"){searchTerm=e.currentTarget.value.trim();renderExplore()}});
-  }
-
-  async function renderHome(){
-    root.innerHTML=shell(`
-      <div class="section-head"><div><p class="eyebrow">YOUR SPACE</p><h2>Good to see you, ${escapeHtml(currentProfile.full_name.split(" ")[0])}.</h2></div></div>
-      <section class="composer">
-        <div class="composer-top"><div><p class="eyebrow">CREATE</p><strong>What do you want to say?</strong></div><span class="muted" id="composerCount">0 / 3000</span></div>
-        <form id="composerForm">
-          <label class="field">Title<input id="composerTitle" name="title" maxlength="120" placeholder="Give your thought a clear title" required></label>
-          <label class="field" style="margin-top:10px">Your thought<textarea id="composerBody" name="body" maxlength="3000" rows="7" placeholder="Write what you actually think. Explain it well." required></textarea></label>
-          <div class="composer-row">
-            <label class="field">Topic<select name="topic"><option>General</option><option>Education</option><option>Society</option><option>Campus</option><option>Careers</option><option>Technology</option><option>India</option><option>Debates</option></select></label>
-            <label class="field">Tags<input name="tags" maxlength="120" placeholder="education, youth, india"></label>
-          </div>
-          <div class="composer-foot"><span class="muted" style="font-size:11px">You can edit or delete your own posts later.</span><button class="primary">Publish</button></div>
-        </form>
-      </section>
-      <div class="section-head"><div><p class="eyebrow">COMMUNITY</p><h2>Latest thoughts</h2></div><button class="secondary" id="refreshFeed">Refresh</button></div>
-      <div id="feed" class="post-list"><div class="empty">Loading conversations…</div></div>
-    `,"home");
-    bindShell();
-    document.getElementById("composerBody").addEventListener("input",e=>document.getElementById("composerCount").textContent=`${e.target.value.length} / 3000`);
-    document.getElementById("composerForm").onsubmit=createPost;
-    document.getElementById("refreshFeed").onclick=()=>loadFeed("latest");
-    await loadFeed("latest");
-  }
-
-  async function createPost(e){
-    e.preventDefault();
-    const f=new FormData(e.currentTarget);
-    const title=String(f.get("title")).trim(), body=String(f.get("body")).trim();
-    if(body.length<20) return toast("Write at least 20 characters.");
-    const tags=String(f.get("tags")||"").split(",").map(x=>x.trim().replace(/^#/,"").toLowerCase()).filter(Boolean).slice(0,8);
-    const {error}=await supabase.from("posts").insert({user_id:currentProfile.id,title,body,topic:f.get("topic"),tags});
-    if(error) return toast(error.message);
-    e.currentTarget.reset(); document.getElementById("composerCount").textContent="0 / 3000";
-    toast("Published.");
-    await loadFeed("latest");
-  }
-
-  async function loadFeed(mode="latest"){
-    feedMode=mode;
-    let query=supabase.from("posts").select("id,user_id,title,body,topic,tags,created_at,updated_at,profiles!posts_user_id_fkey(id,username,full_name,bio)").eq("is_deleted",false).limit(30);
-    if(["Education","Society","Campus","Careers","Technology","India","Debates"].includes(mode)) query=query.eq("topic",mode);
-    if(searchTerm){
-      const q=searchTerm.replace(/[%_]/g,"");
-      query=query.or(`title.ilike.%${q}%,body.ilike.%${q}%,topic.ilike.%${q}%`);
-    }
-    query=query.order("created_at",{ascending:false});
-    const {data,error}=await query;
-    if(error){document.getElementById("feed").innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;return}
-    await renderPosts(data || []);
-  }
-
-  async function renderPosts(posts){
-    const feed=document.getElementById("feed"); if(!feed) return;
-    if(!posts.length){feed.innerHTML=`<div class="empty"><strong>No posts found.</strong><br>Try another topic or start a new conversation.</div>`;return}
-    const ids=posts.map(p=>p.id);
-    const {data:likes=[]}=await supabase.from("likes").select("post_id,user_id").in("post_id",ids);
-    const {data:comments=[]}=await supabase.from("comments").select("id,post_id,user_id,body,created_at,profiles!comments_user_id_fkey(username,full_name)").in("post_id",ids).order("created_at",{ascending:true});
-    const likedSet=new Set((likes||[]).filter(x=>x.user_id===currentProfile.id).map(x=>x.post_id));
-    const counts={}; (likes||[]).forEach(x=>counts[x.post_id]=(counts[x.post_id]||0)+1);
-    const byPost={}; (comments||[]).forEach(c=>(byPost[c.post_id] ||= []).push(c));
-    feed.innerHTML=posts.map(p=>{
-      const profile=p.profiles||{};
-      const cs=(byPost[p.id]||[]).slice(-4);
-      return `<article class="post" data-post="${p.id}">
-        <div class="post-author"><div class="avatar">${initials(profile.full_name||"Q")}</div><div class="post-author-info"><strong>${escapeHtml(profile.full_name||"QAVRIN user")}</strong><span>@${escapeHtml(profile.username||"user")} · ${ago(p.created_at)}</span></div><button class="icon-btn post-menu" data-action="report">•••</button></div>
-        <span class="topic">${escapeHtml(p.topic)}</span>
-        <h3>${escapeHtml(p.title)}</h3>
-        <p class="post-body">${escapeHtml(p.body)}</p>
-        ${(p.tags||[]).length?`<div class="tags">${p.tags.map(t=>`<span class="tag">#${escapeHtml(t)}</span>`).join("")}</div>`:""}
-        <div class="post-actions">
-          <button data-action="like" class="${likedSet.has(p.id)?"active":""}">♥ ${counts[p.id]||0}</button>
-          <button data-action="comment">◯ ${(byPost[p.id]||[]).length}</button>
-          ${p.user_id===currentProfile.id?`<button data-action="delete" class="danger">Delete</button>`:""}
-        </div>
-        <div class="comment-area"><input maxlength="500" placeholder="Add a thoughtful comment…"><button class="primary" data-action="send-comment">Send</button></div>
-        ${cs.length?`<div class="comment-list">${cs.map(c=>`<div class="comment"><strong>${escapeHtml(c.profiles?.full_name||"User")}</strong> · @${escapeHtml(c.profiles?.username||"user")}<br>${escapeHtml(c.body)}</div>`).join("")}</div>`:""}
-      </article>`;
-    }).join("");
-    feed.querySelectorAll("[data-action]").forEach(btn=>btn.onclick=async()=>handlePostAction(btn));
-  }
-
-  async function handlePostAction(btn){
-    const card=btn.closest("[data-post]"), postId=card.dataset.post, action=btn.dataset.action;
-    if(action==="comment"){card.querySelector(".comment-area").classList.toggle("open");return}
-    if(action==="like"){
-      const {data:existing}=await supabase.from("likes").select("post_id").eq("post_id",postId).eq("user_id",currentProfile.id).maybeSingle();
-      if(existing) await supabase.from("likes").delete().eq("post_id",postId).eq("user_id",currentProfile.id);
-      else await supabase.from("likes").insert({post_id:postId,user_id:currentProfile.id});
-      await loadFeed(feedMode); return;
-    }
-    if(action==="delete"){
-      if(!confirm("Delete this post?")) return;
-      const {error}=await supabase.from("posts").update({is_deleted:true}).eq("id",postId).eq("user_id",currentProfile.id);
-      if(error) toast(error.message); else {toast("Post deleted.");await loadFeed(feedMode)}
-      return;
-    }
-    if(action==="send-comment"){
-      const input=card.querySelector(".comment-area input"), body=input.value.trim();
-      if(!body) return;
-      const {error}=await supabase.from("comments").insert({post_id:postId,user_id:currentProfile.id,body});
-      if(error) toast(error.message); else {input.value="";toast("Comment added.");await loadFeed(feedMode)}
-      return;
-    }
-    if(action==="report"){
-      showReport(postId); return;
-    }
-  }
-
-  async function renderExplore(){
-    root.innerHTML=shell(`
-      <div class="section-head"><div><p class="eyebrow">EXPLORE</p><h2>${searchTerm?`Results for “${escapeHtml(searchTerm)}”`:"Discover conversations"}</h2></div><select id="topicFilter" class="secondary" style="padding:10px"><option value="latest">Latest</option>${["Education","Society","Campus","Careers","Technology","India","Debates"].map(t=>`<option ${feedMode===t?"selected":""}>${t}</option>`).join("")}</select></div>
-      <div id="feed" class="post-list"><div class="empty">Loading…</div></div>
-    `,"explore");
-    bindShell();
-    document.getElementById("topicFilter").onchange=e=>loadFeed(e.target.value);
-    await loadFeed(feedMode);
-  }
-
-  async function renderProfile(username){
-    const {data:profile,error}=await supabase.from("profiles").select("*").eq("username",username).single();
-    if(error) return toast(error.message);
-    const {count:postCount}=await supabase.from("posts").select("*",{count:"exact",head:true}).eq("user_id",profile.id).eq("is_deleted",false);
-    const {count:followerCount}=await supabase.from("follows").select("*",{count:"exact",head:true}).eq("following_id",profile.id);
-    const {count:followingCount}=await supabase.from("follows").select("*",{count:"exact",head:true}).eq("follower_id",profile.id);
-    const {data:follow}=await supabase.from("follows").select("follower_id").eq("follower_id",currentProfile.id).eq("following_id",profile.id).maybeSingle();
-    root.innerHTML=shell(`
-      <section class="profile-card">
-        <div class="profile-top">
-          <div class="profile-avatar">${initials(profile.full_name)}</div>
-          <div><h2>${escapeHtml(profile.full_name)}</h2><p>@${escapeHtml(profile.username)}</p></div>
-          <div class="profile-actions">${profile.id!==currentProfile.id?`<button class="${follow?"secondary":"primary"}" id="followBtn">${follow?"Following":"Follow"}</button>`:"<button class="secondary" id="editProfile">Edit profile</button>"}</div>
-        </div>
-        ${profile.bio?`<p class="profile-bio">${escapeHtml(profile.bio)}</p>`:""}
-        <div class="stat-row"><div class="stat"><strong>${postCount||0}</strong><span>Posts</span></div><div class="stat"><strong>${followerCount||0}</strong><span>Followers</span></div><div class="stat"><strong>${followingCount||0}</strong><span>Following</span></div></div>
-      </section>
-      <div class="section-head"><div><p class="eyebrow">POSTS</p><h2>Thoughts by @${escapeHtml(profile.username)}</h2></div></div>
-      <div id="feed" class="post-list"></div>
-    `,"profile");
-    bindShell();
-    if(profile.id!==currentProfile.id) document.getElementById("followBtn").onclick=async()=>{
-      if(follow) await supabase.from("follows").delete().eq("follower_id",currentProfile.id).eq("following_id",profile.id);
-      else await supabase.from("follows").insert({follower_id:currentProfile.id,following_id:profile.id});
-      renderProfile(username);
-    };
-    if(profile.id===currentProfile.id) document.getElementById("editProfile").onclick=showEditProfile;
-    const {data:posts}=await supabase.from("posts").select("id,user_id,title,body,topic,tags,created_at,updated_at,profiles!posts_user_id_fkey(id,username,full_name,bio)").eq("user_id",profile.id).eq("is_deleted",false).order("created_at",{ascending:false});
-    await renderPosts(posts||[]);
-  }
-
-  function renderSettings(){
-    root.innerHTML=shell(`
-      <div class="section-head"><div><p class="eyebrow">ACCOUNT</p><h2>Settings</h2></div></div>
-      <div class="settings-grid">
-        <div class="side-card"><h3>Profile</h3><p>Change your name, username and bio.</p><button class="primary" id="editSettings">Edit profile</button></div>
-        <div class="side-card"><h3>Password</h3><p>Supabase handles password security and reset.</p><button class="secondary" id="resetSettings">Send password reset email</button></div>
-        <div class="side-card"><h3>Community</h3><p>Report posts and comments that break the rules. Do not use reports for ordinary disagreement.</p><button class="secondary" id="rulesSettings">Read rules</button></div>
-        <div class="side-card"><h3>Danger zone</h3><p>Signing out removes this browser session. Account deletion should be implemented through a protected backend flow before launch.</p><button class="secondary danger" id="logoutSettings">Log out</button></div>
-      </div>
-    `,"settings");
-    bindShell();
-    document.getElementById("editSettings").onclick=showEditProfile;
-    document.getElementById("rulesSettings").onclick=showRules;
-    document.getElementById("logoutSettings").onclick=()=>supabase.auth.signOut();
-    document.getElementById("resetSettings").onclick=async()=>{
-      const {error}=await supabase.auth.resetPasswordForEmail((await supabase.auth.getUser()).data.user.email,{redirectTo:location.href});
-      toast(error?error.message:"Password reset email sent.");
-    };
-  }
-
-  function showEditProfile(){
-    const d=document.createElement("dialog"); d.className="modal";
-    d.innerHTML=`<div class="modal-card"><button class="close">×</button><p class="eyebrow">PROFILE</p><h2>Edit your profile</h2><form class="form">
-      <label class="field">Full name<input name="name" value="${escapeHtml(currentProfile.full_name)}" maxlength="60" required></label>
-      <label class="field">Username<input name="username" value="${escapeHtml(currentProfile.username)}" maxlength="24" pattern="[A-Za-z0-9_]+" required></label>
-      <label class="field">Bio<textarea name="bio" maxlength="160" rows="4">${escapeHtml(currentProfile.bio||"")}</textarea></label>
-      <button class="primary full">Save changes</button></form></div>`;
-    document.body.appendChild(d); d.showModal();
-    d.querySelector(".close").onclick=()=>d.close();
-    d.querySelector("form").onsubmit=async e=>{
-      e.preventDefault(); const f=new FormData(e.currentTarget);
-      const username=String(f.get("username")).trim().toLowerCase();
-      if(!/^[a-z0-9_]{3,24}$/.test(username)) return toast("Username must be 3–24 letters, numbers or underscores.");
-      const {data,error}=await supabase.rpc("update_my_profile",{p_full_name:String(f.get("name")).trim(),p_username:username,p_bio:String(f.get("bio")||"").trim()});
-      if(error) return toast(error.message);
-      currentProfile=data; d.close(); d.remove(); toast("Profile updated."); renderProfile(currentProfile.username);
-    };
-  }
-
-  function showRules(){
-    const d=document.createElement("dialog");d.className="modal";
-    d.innerHTML=`<div class="modal-card"><button class="close">×</button><p class="eyebrow">COMMUNITY RULES</p><h2>Keep QAVRIN worth reading.</h2>
-    <div style="display:grid;gap:12px;color:#475467;font-size:13px;line-height:1.6">
-      <div><strong>1. Challenge ideas, not people.</strong><br>No harassment, threats or targeted abuse.</div>
-      <div><strong>2. No hate or dehumanisation.</strong><br>Do not attack people based on protected characteristics.</div>
-      <div><strong>3. No illegal or dangerous instructions.</strong><br>Do not use QAVRIN to facilitate wrongdoing.</div>
-      <div><strong>4. No spam or manipulation.</strong><br>No fake engagement, scams, impersonation or mass posting.</div>
-      <div><strong>5. Respect privacy.</strong><br>Do not post private personal information about others.</div>
-      <div><strong>6. Report problems.</strong><br>Use the report control when content actually breaks the rules.</div>
-    </div></div>`;
-    document.body.appendChild(d);d.showModal();d.querySelector(".close").onclick=()=>{d.close();d.remove()};
-  }
-
-  function showReport(postId){
-    const d=document.createElement("dialog");d.className="modal";
-    d.innerHTML=`<div class="modal-card"><button class="close">×</button><p class="eyebrow">REPORT</p><h2>What is wrong with this post?</h2><form class="form">
-      <label class="field">Reason<select name="reason"><option>Harassment</option><option>Hate or abuse</option><option>Threat</option><option>Spam or scam</option><option>Privacy violation</option><option>Illegal or dangerous content</option><option>Other</option></select></label>
-      <label class="field">Details<textarea name="details" maxlength="500" rows="4" placeholder="Tell moderators what happened."></textarea></label>
-      <button class="primary full">Submit report</button></form></div>`;
-    document.body.appendChild(d);d.showModal();d.querySelector(".close").onclick=()=>{d.close();d.remove()};
-    d.querySelector("form").onsubmit=async e=>{
-      e.preventDefault();const f=new FormData(e.currentTarget);
-      const {error}=await supabase.from("reports").insert({reporter_id:currentProfile.id,post_id:postId,reason:f.get("reason"),details:String(f.get("details")||"").trim()});
-      if(error) toast(error.message); else {toast("Report submitted.");d.close();d.remove()}
-    };
-  }
-
-  init();
-})();
+const KEY="qavrin-local-v4";let db=load();let session=localStorage.getItem(KEY+"_session");
+const seeds=[
+{id:"p1",userId:"u1",name:"Ishita Sharma",username:"ishita07",title:"Is our education system preparing us for real life?",body:"We memorise for exams, not for understanding. We compete for marks, not for growth.\n\nIt is time we rethink what success really means.",topic:"Education",tags:["education","youth"],createdAt:Date.now()-7200000,likes:1200,likedBy:[],savedBy:[],comments:[]},
+{id:"p2",userId:"u2",name:"Raghav Mehta",username:"raghavwrites",title:"We need better spaces for disagreement.",body:"A healthy debate is not about winning. It is about leaving the conversation with a better understanding of the other side.",topic:"Society",tags:["society","debates"],createdAt:Date.now()-15000000,likes:730,likedBy:[],savedBy:[],comments:[]},
+{id:"p3",userId:"u3",name:"Mehak Verma",username:"mehakwrites",title:"What should colleges teach that textbooks do not?",body:"Money, communication, basic law, digital safety and critical thinking should not be optional life lessons.",topic:"Campus",tags:["campus","education","india"],createdAt:Date.now()-28000000,likes:482,likedBy:[],savedBy:[],comments:[]},
+{id:"p4",userId:"u4",name:"Arjun Nair",username:"arjunn",title:"Your first job is not supposed to be your final identity.",body:"We put too much pressure on young people to choose one path at 20. Careers change. Skills compound. Learning should matter more than a perfect first decision.",topic:"Careers",tags:["careers","youngindia"],createdAt:Date.now()-40000000,likes:341,likedBy:[],savedBy:[],comments:[]}
+];
+function load(){try{let x=JSON.parse(localStorage.getItem(KEY));return x&&x.users?x:{users:[],posts:seeds,notifications:[]}}catch{return{users:[],posts:seeds,notifications:[]}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+function user(){return db.users.find(x=>x.id===session)||null}
+function esc(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function ago(t){let m=Math.max(1,Math.floor((Date.now()-t)/60000));if(m<60)return m+"m";let h=Math.floor(m/60);if(h<24)return h+"h";return Math.floor(h/24)+"d"}
+function toast(s){let n=document.getElementById("toast");n.textContent=s;n.classList.add("show");setTimeout(()=>n.classList.remove("show"),1800)}
+function initials(name){return (name||"Q").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase()}
+function ensureUser(){if(user())return;let d={id:"demo",name:"Demo User",username:"demo_user",email:"demo@qavrin.in",password:"qavrin123",bio:"Here to read, think and write."};if(!db.users.length)db.users.push(d);session=db.users[0].id;save()}
+function renderIdentity(){let u=user();if(!u)return;document.getElementById("sideName").textContent=u.name;document.getElementById("sideHandle").textContent="@"+u.username;document.getElementById("sideAvatar").textContent=initials(u.name);document.getElementById("profileAvatar").textContent=initials(u.name);document.getElementById("profileName").textContent=u.name;document.getElementById("profileHandle").textContent="@"+u.username;document.getElementById("profileBio").textContent=u.bio||"Your voice. Your perspective.";document.getElementById("composerAvatar").textContent=initials(u.name);document.getElementById("composerName").textContent=u.name}
+function postHTML(p){let u=user(),liked=p.likedBy?.includes(u?.id),saved=p.savedBy?.includes(u?.id),comments=p.comments||[];return `<article class="post" data-id="${p.id}"><div class="post-top"><div class="post-author"><div class="avatar-letter">${esc(initials(p.name))}</div><div><strong>${esc(p.name)}</strong><span>@${esc(p.username)} · ${ago(p.createdAt)}</span></div></div><span class="topic">${esc(p.topic)}</span></div><h3>${esc(p.title)}</h3><div class="post-body">${esc(p.body)}</div>${p.tags?.length?`<div class="tags">${p.tags.map(x=>`<span>#${esc(x)}</span>`).join("")}</div>`:""}<div class="post-actions"><button class="action ${liked?"active":""}" data-a="like">♥ ${p.likes}</button><button class="action" data-a="comments">◯ ${comments.length}</button><button class="action ${saved?"active":""}" data-a="save">◇ ${saved?"Saved":"Save"}</button>${p.userId===u?.id?`<button class="action" data-a="delete">Delete</button>`:""}</div><div class="comment-box"><input maxlength="180" placeholder="Add a comment"><button data-a="send">Send</button></div>${comments.slice(-4).map(c=>`<div class="comments"><div class="comment"><b>${esc(c.name)}</b> · @${esc(c.username)}<br>${esc(c.text)}</div></div>`).join("")}</article>`}
+function getPosts(){let q=(document.getElementById("searchInput")?.value||"").toLowerCase(),topic=document.getElementById("topicFilter")?.value||"all",sort=document.querySelector(".seg.active")?.dataset.sort||"latest";let a=[...db.posts];if(q)a=a.filter(p=>(p.title+" "+p.body+" "+p.name+" "+p.username+" "+p.tags.join(" ")).toLowerCase().includes(q));if(topic!=="all")a=a.filter(p=>p.topic===topic);if(sort==="popular")a.sort((x,y)=>y.likes-x.likes);else a.sort((x,y)=>y.createdAt-x.createdAt);return a}
+function renderFeed(target="feed",posts=getPosts()){let n=document.getElementById(target);if(!n)return;n.innerHTML=posts.length?posts.map(postHTML).join(""):`<div class="post"><strong>No thoughts found.</strong><p class="muted">Try another search or topic.</p></div>`}
+function switchView(view){document.querySelectorAll(".view").forEach(x=>x.classList.add("hidden"));document.getElementById(view+"View").classList.remove("hidden");document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.view===view));let titles={home:["YOUR FEED","Thoughts worth reading."],explore:["EXPLORE","Find a conversation."],notifications:["NOTIFICATIONS","Stay in the loop."],profile:["PROFILE","Your QAVRIN."],saved:["SAVED","Things worth revisiting."]};document.getElementById("viewOverline").textContent=titles[view][0];document.getElementById("viewTitle").textContent=titles[view][1];if(view==="home")renderFeed();if(view==="explore")renderExplore();if(view==="notifications")renderNotifications();if(view==="profile")renderProfile();if(view==="saved")renderSaved();document.getElementById("sidebar").classList.remove("open")}
+function openModal(id){document.getElementById(id).classList.remove("hidden")}
+function closeModal(id){document.getElementById(id).classList.add("hidden")}
+function renderExplore(){let counts={};db.posts.forEach(p=>counts[p.topic]=(counts[p.topic]||0)+1);document.getElementById("topicGrid").innerHTML=["India","Education","Careers","Campus","Technology","Society","Debates","General"].map(t=>`<button class="topic-tile" data-topic-tile="${t}"><strong>${t}</strong><span>${counts[t]||0} conversations</span></button>`).join("");renderFeed("exploreFeed",[...db.posts].sort((a,b)=>b.likes-a.likes))}
+function renderNotifications(){let n=document.getElementById("notificationsList");let arr=db.notifications.length?db.notifications:[{text:"Welcome to QAVRIN. This is your notifications space.",time:"now",read:false},{text:"Start by writing your first thought.",time:"now",read:false},{text:"Explore topics to find people you want to read.",time:"now",read:false}];n.innerHTML=arr.map(x=>`<div class="notification ${x.read?"":"unread"}"><div class="mini-avatar">Q</div><div><strong>${esc(x.text)}</strong><span>QAVRIN</span></div><time>${esc(x.time)}</time></div>`).join("")}
+function renderProfile(){let u=user();let mine=db.posts.filter(p=>p.userId===u.id);document.getElementById("statPosts").textContent=mine.length;document.getElementById("statFollowers").textContent="0";document.getElementById("statFollowing").textContent="0";renderFeed("profileFeed",mine)}
+function renderSaved(){let u=user();renderFeed("savedFeed",db.posts.filter(p=>p.savedBy?.includes(u.id)))}
+function publish(){let u=user();if(!u){openModal("authModal");return}let title=document.getElementById("postTitle").value.trim(),body=document.getElementById("postBody").value.trim();if(title.length<4)return toast("Add a clear title.");if(body.length<20)return toast("Write a little more.");let tags=document.getElementById("postTags").value.split(",").map(x=>x.trim().replace(/^#/,"")).filter(Boolean).slice(0,6);db.posts.unshift({id:crypto.randomUUID(),userId:u.id,name:u.name,username:u.username,title,body,topic:document.getElementById("postTopic").value,tags,createdAt:Date.now(),likes:0,likedBy:[],savedBy:[],comments:[]});save();["postTitle","postBody","postTags"].forEach(id=>document.getElementById(id).value="");document.getElementById("postCount").textContent="0/1500";closeModal("composerModal");renderFeed();toast("Published.");}
+function authMode(mode){document.querySelectorAll(".auth-tab").forEach(x=>x.classList.toggle("active",x.dataset.auth===mode));document.getElementById("loginForm").classList.toggle("hidden",mode!=="login");document.getElementById("signupForm").classList.toggle("hidden",mode!=="signup")}
+function login(e){e.preventDefault();let email=document.getElementById("loginEmail").value.trim().toLowerCase(),pass=document.getElementById("loginPassword").value,u=db.users.find(x=>x.email===email&&x.password===pass);if(!u)return toast("Email or password is incorrect.");session=u.id;localStorage.setItem(KEY+"_session",session);closeModal("authModal");renderIdentity();toast("Welcome back.");}
+function signup(e){e.preventDefault();let name=document.getElementById("signupName").value.trim(),username=document.getElementById("signupUsername").value.trim().toLowerCase(),email=document.getElementById("signupEmail").value.trim().toLowerCase(),pass=document.getElementById("signupPassword").value;if(db.users.some(x=>x.email===email))return toast("Email already registered.");if(db.users.some(x=>x.username===username))return toast("Username already taken.");let u={id:crypto.randomUUID(),name,username,email,password:pass,bio:""};db.users.push(u);session=u.id;localStorage.setItem(KEY+"_session",session);save();closeModal("authModal");renderIdentity();toast("Account created.");}
+document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>switchView(x.dataset.view));
+document.querySelectorAll(".topic-nav button").forEach(x=>x.onclick=()=>{document.getElementById("topicFilter").value=x.dataset.topic;switchView("home")});
+document.getElementById("openComposer").onclick=()=>user()?openModal("composerModal"):openModal("authModal");
+document.getElementById("headerCompose").onclick=()=>user()?openModal("composerModal"):openModal("authModal");
+document.getElementById("bannerWrite").onclick=()=>user()?openModal("composerModal"):openModal("authModal");
+document.getElementById("publish").onclick=publish;
+document.getElementById("searchInput").oninput=()=>renderFeed();
+document.getElementById("topicFilter").onchange=()=>renderFeed();
+document.querySelectorAll(".seg").forEach(x=>x.onclick=()=>{document.querySelectorAll(".seg").forEach(y=>y.classList.remove("active"));x.classList.add("active");renderFeed()});
+document.querySelectorAll("[data-close]").forEach(x=>x.onclick=()=>closeModal(x.dataset.close));
+document.querySelectorAll(".auth-tab").forEach(x=>x.onclick=()=>authMode(x.dataset.auth));
+document.getElementById("loginForm").onsubmit=login;document.getElementById("signupForm").onsubmit=signup;
+document.getElementById("demoLogin").onclick=()=>{ensureUser();localStorage.setItem(KEY+"_session",session);closeModal("authModal");renderIdentity();toast("Signed in.")};
+document.getElementById("logoutBtn")?.addEventListener("click",()=>{session=null;localStorage.removeItem(KEY+"_session");location.reload()});
+document.getElementById("accountButton").onclick=()=>switchView("profile");
+document.getElementById("mobileMenu").onclick=()=>document.getElementById("sidebar").classList.toggle("open");
+document.getElementById("mobileSearch").onclick=()=>document.getElementById("searchInput").focus();
+document.getElementById("postBody").oninput=e=>document.getElementById("postCount").textContent=e.target.value.length+"/1500";
+document.getElementById("feed").onclick=handlePostAction;document.getElementById("exploreFeed").onclick=handlePostAction;document.getElementById("profileFeed").onclick=handlePostAction;document.getElementById("savedFeed").onclick=handlePostAction;
+function handlePostAction(e){let card=e.target.closest(".post");if(!card)return;let p=db.posts.find(x=>x.id===card.dataset.id),u=user(),a=e.target.closest("[data-a]")?.dataset.a;if(!p||!u)return;if(a==="like"){p.likedBy=p.likedBy||[];let i=p.likedBy.indexOf(u.id);if(i>=0){p.likedBy.splice(i,1);p.likes--}else{p.likedBy.push(u.id);p.likes++}save();renderFeed(card.closest("#profileFeed")?"profileFeed":card.closest("#savedFeed")?"savedFeed":"feed")}
+if(a==="save"){p.savedBy=p.savedBy||[];let i=p.savedBy.indexOf(u.id);if(i>=0)p.savedBy.splice(i,1);else p.savedBy.push(u.id);save();toast(i>=0?"Removed from saved":"Saved");renderFeed(card.closest("#savedFeed")?"savedFeed":"feed")}
+if(a==="delete"){db.posts=db.posts.filter(x=>x.id!==p.id);save();renderFeed();toast("Post deleted.")}
+if(a==="comments"){card.querySelector(".comment-box").classList.toggle("hidden")}
+if(a==="send"){let input=card.querySelector(".comment-box input"),text=input.value.trim();if(!text)return;p.comments=p.comments||[];p.comments.push({name:u.name,username:u.username,text});save();renderFeed();toast("Comment added.")}
+}
+document.getElementById("editProfile").onclick=()=>{let u=user();document.getElementById("editName").value=u.name;document.getElementById("editBio").value=u.bio||"";openModal("editModal")};
+document.getElementById("editForm").onsubmit=e=>{e.preventDefault();let u=user();u.name=document.getElementById("editName").value.trim();u.bio=document.getElementById("editBio").value.trim();save();renderIdentity();closeModal("editModal");toast("Profile updated.")};
+document.getElementById("markRead").onclick=()=>{db.notifications.forEach(x=>x.read=true);save();renderNotifications();document.getElementById("notificationBadge").textContent="0"};
+document.getElementById("exploreSearch").oninput=e=>{let q=e.target.value.toLowerCase();renderFeed("exploreFeed",db.posts.filter(p=>(p.title+" "+p.body+" "+p.name+" "+p.tags.join(" ")).toLowerCase().includes(q)))};
+document.getElementById("topicGrid").onclick=e=>{let t=e.target.closest("[data-topic-tile]")?.dataset.topicTile;if(t){document.getElementById("topicFilter").value=t;switchView("home")}};
+document.querySelectorAll(".person button").forEach(b=>b.onclick=()=>{b.textContent=b.textContent==="Follow"?"Following":"Follow";toast(b.textContent==="Following"?"Following":"Unfollowed")});
+if(!db.users.length){db.users.push({id:"demo",name:"Demo User",username:"demo_user",email:"demo@qavrin.in",password:"qavrin123",bio:"Here to read, think and write."});save()}
+if(session&&!user())session=null;
+renderIdentity();renderFeed();renderNotifications();

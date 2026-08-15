@@ -2,19 +2,190 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b46bc">
-  <meta name="description" content="QAVRIN — a place for Indian youth to share thoughts, ideas, opinions and perspectives.">
-  <title>QAVRIN — Think. Write. Be heard.</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QAVRIN — Your voice. Your perspective.</title>
+  <meta name="description" content="QAVRIN is a conversation-first platform for Indian youth to share thoughts, ideas and perspectives.">
   <link rel="icon" href="assets/qavrin-logo.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="app"></div>
-  <div id="toast" class="toast" aria-live="polite"></div>
+<div id="app">
+  <div class="mobile-top">
+    <button class="icon-btn" id="mobileMenu" aria-label="Open menu">☰</button>
+    <img src="assets/qavrin-logo.png" class="mobile-logo" alt="QAVRIN">
+    <button class="icon-btn" id="mobileSearch" aria-label="Search">⌕</button>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-inner">
+      <img src="assets/qavrin-logo.png" class="logo" alt="QAVRIN">
+      <button class="compose-btn" id="openComposer">＋ Write a thought</button>
+
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="home"><span>⌂</span> Home</button>
+        <button class="nav-item" data-view="explore"><span>⌕</span> Explore</button>
+        <button class="nav-item" data-view="notifications"><span>♧</span> Notifications <b id="notificationBadge" class="nav-badge">3</b></button>
+        <button class="nav-item" data-view="profile"><span>◎</span> Profile</button>
+        <button class="nav-item" data-view="saved"><span>◇</span> Saved</button>
+      </nav>
+
+      <div class="sidebar-rule"></div>
+      <p class="nav-label">DISCOVER</p>
+      <nav class="topic-nav">
+        <button data-topic="India">India</button>
+        <button data-topic="Education">Education</button>
+        <button data-topic="Careers">Careers</button>
+        <button data-topic="Campus">Campus</button>
+        <button data-topic="Technology">Technology</button>
+        <button data-topic="Society">Society</button>
+        <button data-topic="Debates">Debates</button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+      <button class="account-card" id="accountButton">
+        <div class="avatar-letter" id="sideAvatar">Q</div>
+        <div class="account-copy"><strong id="sideName">Guest</strong><span id="sideHandle">@guest</span></div>
+        <span>•••</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="content-header">
+      <div>
+        <p class="overline" id="viewOverline">YOUR FEED</p>
+        <h1 id="viewTitle">Thoughts worth reading.</h1>
+      </div>
+      <div class="header-actions">
+        <label class="search">
+          <span>⌕</span><input id="searchInput" placeholder="Search QAVRIN">
+        </label>
+        <button class="round-btn" id="headerCompose" aria-label="Write">＋</button>
+      </div>
+    </header>
+
+    <section id="homeView" class="view">
+      <div class="welcome-banner">
+        <div>
+          <span class="eyebrow">QAVRIN</span>
+          <h2>Say what you mean.</h2>
+          <p>Ideas, opinions and everyday conversations from India.</p>
+        </div>
+        <button class="banner-btn" id="bannerWrite">Start writing →</button>
+      </div>
+
+      <div class="feed-toolbar">
+        <div class="segmented">
+          <button class="seg active" data-sort="latest">Latest</button>
+          <button class="seg" data-sort="popular">Popular</button>
+          <button class="seg" data-sort="following">Following</button>
+        </div>
+        <select id="topicFilter"><option value="all">All topics</option><option>India</option><option>Education</option><option>Careers</option><option>Campus</option><option>Technology</option><option>Society</option><option>Debates</option></select>
+      </div>
+      <div id="feed" class="feed"></div>
+    </section>
+
+    <section id="exploreView" class="view hidden">
+      <div class="explore-hero">
+        <div>
+          <span class="eyebrow">EXPLORE</span>
+          <h2>Find a conversation.</h2>
+          <p>Start with a topic. Stay for the perspective.</p>
+        </div>
+        <div class="explore-search"><span>⌕</span><input id="exploreSearch" placeholder="Search thoughts, topics or people"></div>
+      </div>
+      <div class="topic-grid" id="topicGrid"></div>
+      <div class="section-title"><h2>Trending discussions</h2><span>Today</span></div>
+      <div id="exploreFeed" class="feed"></div>
+    </section>
+
+    <section id="notificationsView" class="view hidden">
+      <div class="section-title"><h2>Notifications</h2><button class="text-btn" id="markRead">Mark all read</button></div>
+      <div id="notificationsList" class="notification-list"></div>
+    </section>
+
+    <section id="profileView" class="view hidden">
+      <div class="profile-hero">
+        <div class="profile-avatar" id="profileAvatar">Q</div>
+        <div class="profile-main"><span class="eyebrow">PROFILE</span><h2 id="profileName">QAVRIN</h2><p id="profileHandle">@qavrin</p><p id="profileBio">Your voice. Your perspective.</p></div>
+        <button class="outline-btn" id="editProfile">Edit profile</button>
+      </div>
+      <div class="profile-stats"><div><strong id="statPosts">0</strong><span>Posts</span></div><div><strong id="statFollowers">0</strong><span>Followers</span></div><div><strong id="statFollowing">0</strong><span>Following</span></div></div>
+      <div class="section-title"><h2>Your thoughts</h2></div>
+      <div id="profileFeed" class="feed"></div>
+    </section>
+
+    <section id="savedView" class="view hidden">
+      <div class="section-title"><h2>Saved</h2><span>Posts you want to revisit</span></div>
+      <div id="savedFeed" class="feed"></div>
+    </section>
+  </main>
+
+  <aside class="right-rail">
+    <div class="rail-card">
+      <div class="rail-heading"><h3>Trending on QAVRIN</h3><span>Today</span></div>
+      <div class="trend"><b>01</b><div><strong>#EducationReform</strong><span>1.8K thoughts</span></div></div>
+      <div class="trend"><b>02</b><div><strong>#FirstJob</strong><span>1.2K thoughts</span></div></div>
+      <div class="trend"><b>03</b><div><strong>#IndianCampuses</strong><span>904 thoughts</span></div></div>
+      <div class="trend"><b>04</b><div><strong>#TechForIndia</strong><span>742 thoughts</span></div></div>
+    </div>
+    <div class="rail-card people-card">
+      <div class="rail-heading"><h3>People to read</h3></div>
+      <div class="person"><div class="mini-avatar">A</div><div><strong>Ananya Rao</strong><span>@ananyarao</span></div><button>Follow</button></div>
+      <div class="person"><div class="mini-avatar">R</div><div><strong>Rohan Verma</strong><span>@rohanv</span></div><button>Follow</button></div>
+      <div class="person"><div class="mini-avatar">M</div><div><strong>Mehak Singh</strong><span>@mehakwrites</span></div><button>Follow</button></div>
+    </div>
+    <p class="rail-footer">QAVRIN · Community Guidelines · Privacy · Terms</p>
+  </aside>
+</div>
+
+<div class="modal-backdrop hidden" id="authModal">
+  <div class="modal auth-modal">
+    <button class="close" data-close="authModal">×</button>
+    <div class="auth-branding"><img src="assets/qavrin-logo.png" alt="QAVRIN"><p>Your voice. Your perspective.</p></div>
+    <div class="auth-tabs"><button class="auth-tab active" data-auth="login">Log in</button><button class="auth-tab" data-auth="signup">Create account</button></div>
+    <form id="loginForm" class="form">
+      <h2>Welcome back.</h2><p>Continue the conversations that matter to you.</p>
+      <label>Email<input id="loginEmail" type="email" required placeholder="you@example.com"></label>
+      <label>Password<input id="loginPassword" type="password" required placeholder="Your password"></label>
+      <button class="primary" type="submit">Log in</button>
+      <button class="demo-link" type="button" id="demoLogin">Continue as demo user</button>
+    </form>
+    <form id="signupForm" class="form hidden">
+      <h2>Join QAVRIN.</h2><p>Create your identity and start your first conversation.</p>
+      <label>Full name<input id="signupName" maxlength="50" required placeholder="Your name"></label>
+      <label>Username<input id="signupUsername" maxlength="24" pattern="[A-Za-z0-9_]+" required placeholder="yourusername"></label>
+      <label>Email<input id="signupEmail" type="email" required placeholder="you@example.com"></label>
+      <label>Password<input id="signupPassword" type="password" minlength="8" required placeholder="At least 8 characters"></label>
+      <button class="primary" type="submit">Create account</button>
+    </form>
+    <small class="auth-foot">By continuing, you agree to QAVRIN's Terms and Community Guidelines.</small>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="composerModal">
+  <div class="modal composer">
+    <button class="close" data-close="composerModal">×</button>
+    <div class="composer-head"><div class="avatar-letter" id="composerAvatar">Q</div><div><strong id="composerName">You</strong><span>Share a thought with QAVRIN</span></div></div>
+    <label class="composer-title">Title<input id="postTitle" maxlength="100" placeholder="What's on your mind?"></label>
+    <textarea id="postBody" maxlength="1500" placeholder="Write your thought here..."></textarea>
+    <div class="composer-meta"><select id="postTopic"><option>General</option><option>India</option><option>Education</option><option>Careers</option><option>Campus</option><option>Technology</option><option>Society</option><option>Debates</option></select><input id="postTags" maxlength="100" placeholder="#tags, comma separated"><span id="postCount">0/1500</span></div>
+    <div class="composer-bottom"><span>Be honest. Be respectful.</span><button class="primary" id="publish">Publish thought</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="editModal">
+  <div class="modal">
+    <button class="close" data-close="editModal">×</button><h2>Edit profile</h2>
+    <form id="editForm" class="form">
+      <label>Full name<input id="editName" maxlength="50"></label>
+      <label>Bio<textarea id="editBio" maxlength="160" rows="3"></textarea></label>
+      <button class="primary" type="submit">Save changes</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
 </body>
 </html>
