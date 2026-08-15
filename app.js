@@ -1,276 +1,386 @@
-const STORAGE_KEY = "qavrin-demo-v1";
+const DB_KEY = "qavrin-trial-db-v2";
+const SESSION_KEY = "qavrin-trial-session-v2";
 
-const defaultPosts = [
+const seedPosts = [
   {
     id: crypto.randomUUID(),
-    author: "Ishita Sharma",
-    handle: "@ishita07",
-    location: "New Delhi",
-    time: "2h ago",
-    category: "education",
-    tag: "Thought",
+    userId: "seed-ishita",
+    name: "Ishita Sharma",
+    username: "ishita07",
     title: "Is our education system preparing us for real life?",
-    body: "We memorize for exams, not for understanding. We compete for marks, not for growth.\n\nIt’s time we rethink what success really means.",
-    hashtags: "#Education #YouthVoice #Reform",
-    likes: 1240,
-    comments: 230,
-    shares: 185,
-    liked: false,
-    saved: false,
-    avatar: "assets/avatar-ishita.svg"
+    body: "We memorise for exams, not for understanding. We compete for marks, not for growth.\n\nIt is time we rethink what success really means.",
+    topic: "Education",
+    tags: ["education","youth","reform"],
+    createdAt: Date.now() - 2 * 60 * 60 * 1000,
+    likes: 1200,
+    likedBy: [],
+    comments: []
   },
   {
     id: crypto.randomUUID(),
-    author: "Raghav Mehta",
-    handle: "@raghavwrites",
-    location: "Mumbai",
-    time: "4h ago",
-    category: "society",
-    tag: "Society",
-    title: "We need more spaces where young people can disagree without becoming enemies.",
+    userId: "seed-raghav",
+    name: "Raghav Mehta",
+    username: "raghavwrites",
+    title: "We need better spaces for disagreement.",
     body: "A healthy debate is not about winning. It is about leaving the conversation with a better understanding of the other side.",
-    hashtags: "#Society #Debates #YouthVoice",
-    likes: 732,
-    comments: 91,
-    shares: 64,
-    liked: false,
-    saved: false,
-    avatar: "assets/avatar-raghav.svg"
+    topic: "Society",
+    tags: ["society","debates","youthvoice"],
+    createdAt: Date.now() - 5 * 60 * 60 * 1000,
+    likes: 730,
+    likedBy: [],
+    comments: []
   },
   {
     id: crypto.randomUUID(),
-    author: "Mehak Verma",
-    handle: "@mehakv",
-    location: "Pune",
-    time: "7h ago",
-    category: "campus",
-    tag: "Campus",
-    title: "What should colleges teach that textbooks don't?",
-    body: "Money, communication, basic law, digital safety and how to think critically. These should not be optional life lessons.",
-    hashtags: "#Campus #Education #India",
-    likes: 489,
-    comments: 52,
-    shares: 37,
-    liked: false,
-    saved: false,
-    avatar: "assets/avatar-mehak.svg"
+    userId: "seed-mehak",
+    name: "Mehak Verma",
+    username: "mehakv",
+    title: "What should colleges teach that textbooks do not?",
+    body: "Money, communication, basic law, digital safety and critical thinking should not be optional life lessons.",
+    topic: "Campus",
+    tags: ["campus","education","india"],
+    createdAt: Date.now() - 9 * 60 * 60 * 1000,
+    likes: 482,
+    likedBy: [],
+    comments: []
   }
 ];
 
-const voices = [
-  ["You", "assets/avatar-you.svg"],
-  ["Ananya", "assets/avatar-ananya.svg"],
-  ["Rohit", "assets/avatar-rohit.svg"],
-  ["Mehak", "assets/avatar-mehak.svg"],
-  ["Arjun", "assets/avatar-arjun.svg"]
-];
+function defaultDB() {
+  return {
+    users: [],
+    posts: seedPosts,
+    comments: []
+  };
+}
 
-let state = loadState();
-let activeFilter = "popular";
-
-function loadState() {
+function loadDB() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return saved && Array.isArray(saved.posts) ? saved : { posts: defaultPosts, comments: {} };
+    const parsed = JSON.parse(localStorage.getItem(DB_KEY));
+    return parsed && parsed.users && parsed.posts ? parsed : defaultDB();
   } catch {
-    return { posts: defaultPosts, comments: {} };
+    return defaultDB();
   }
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+let db = loadDB();
+
+function saveDB() {
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
 }
 
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[ch]));
+function saveSession(userId) {
+  localStorage.setItem(SESSION_KEY, userId);
 }
 
-function formatCount(n) {
-  if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(".0","") + "K";
-  return String(n);
+function getSessionUser() {
+  const id = localStorage.getItem(SESSION_KEY);
+  return db.users.find(user => user.id === id) || null;
 }
 
-function renderVoices() {
-  document.getElementById("voiceRow").innerHTML = voices.map(([name, src]) => `
-    <div class="voice">
-      <img src="${src}" alt="" />
-      <span class="voice-name">${name}</span>
-    </div>
-  `).join("");
+function logout() {
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
 }
 
-function filteredPosts() {
-  let posts = [...state.posts];
-  if (activeFilter === "recent") return posts.reverse();
-  if (activeFilter === "debates") return posts.filter(p => p.category === "debates");
-  if (activeFilter === "campus") return posts.filter(p => p.category === "campus");
-  if (activeFilter === "society") return posts.filter(p => p.category === "society");
-  return posts.sort((a, b) => (b.likes + b.comments * 2) - (a.likes + a.comments * 2));
+function esc(value="") {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
 }
 
-function renderFeed() {
-  const feed = document.getElementById("feed");
-  const posts = filteredPosts();
-  if (!posts.length) {
-    feed.innerHTML = `<div class="post-card"><strong>Nothing here yet.</strong><p class="muted">Start the conversation and make QAVRIN yours.</p></div>`;
-    return;
-  }
-
-  feed.innerHTML = posts.map(post => {
-    const body = escapeHtml(post.body).replace(/\n/g, "<br>");
-    return `
-      <article class="post-card" data-id="${post.id}">
-        <div class="post-head">
-          <img src="${post.avatar}" alt="" />
-          <div class="post-author">
-            <strong>${escapeHtml(post.author)}</strong>
-            <div class="meta">${escapeHtml(post.handle)} · ${escapeHtml(post.time)} · ${escapeHtml(post.location)}</div>
-          </div>
-          <button class="icon-btn more-btn" aria-label="More">⋮</button>
-        </div>
-        <span class="tag">${escapeHtml(post.tag)}</span>
-        <h3 class="post-title">${escapeHtml(post.title)}</h3>
-        <p class="post-body">${body}</p>
-        <div class="hashtags">${escapeHtml(post.hashtags)}</div>
-        <div class="post-actions">
-          <button class="action ${post.liked ? "liked" : ""}" data-action="like">♥ ${formatCount(post.likes)}</button>
-          <button class="action" data-action="comment">◯ ${formatCount(post.comments)}</button>
-          <button class="action" data-action="share">↗ ${formatCount(post.shares)}</button>
-          <span class="action-spacer"></span>
-          <button class="action ${post.saved ? "saved" : ""}" data-action="save">▢</button>
-        </div>
-        <div class="comment-box" data-comment-box>
-          <input type="text" maxlength="180" placeholder="Add a thought..." />
-          <button data-action="send-comment">Send</button>
-        </div>
-      </article>
-    `;
-  }).join("");
+function timeAgo(ts) {
+  const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 function toast(message) {
   const node = document.getElementById("toast");
   node.textContent = message;
   node.classList.add("show");
-  setTimeout(() => node.classList.remove("show"), 1800);
+  setTimeout(() => node.classList.remove("show"), 1900);
+}
+
+function showAuth(tab) {
+  document.querySelectorAll(".auth-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.authTab === tab);
+  });
+  document.getElementById("loginForm").classList.toggle("hidden", tab !== "login");
+  document.getElementById("signupForm").classList.toggle("hidden", tab !== "signup");
+}
+
+function currentUser() {
+  return getSessionUser();
+}
+
+function appStart() {
+  const user = currentUser();
+  const auth = document.getElementById("authScreen");
+  const app = document.getElementById("appScreen");
+
+  if (user) {
+    auth.classList.add("hidden");
+    app.classList.remove("hidden");
+    document.getElementById("currentUserName").textContent = user.name;
+    document.getElementById("currentUserHandle").textContent = `@${user.username}`;
+    document.getElementById("welcomeTitle").textContent = `Write what you think, ${user.name.split(" ")[0]}.`;
+    renderFeed();
+  } else {
+    auth.classList.remove("hidden");
+    app.classList.add("hidden");
+  }
+}
+
+function registerUser(event) {
+  event.preventDefault();
+  const name = document.getElementById("signupName").value.trim();
+  const username = document.getElementById("signupUsername").value.trim().toLowerCase();
+  const email = document.getElementById("signupEmail").value.trim().toLowerCase();
+  const password = document.getElementById("signupPassword").value;
+
+  if (db.users.some(u => u.email === email)) return toast("That email is already registered.");
+  if (db.users.some(u => u.username === username)) return toast("That username is already taken.");
+
+  // Trial only: password is stored locally. Never do this in production.
+  const user = { id: crypto.randomUUID(), name, username, email, password, createdAt: Date.now() };
+  db.users.push(user);
+  saveDB();
+  saveSession(user.id);
+  toast("Account created.");
+  document.getElementById("signupForm").reset();
+  appStart();
+}
+
+function loginUser(event) {
+  event.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+  const password = document.getElementById("loginPassword").value;
+  const user = db.users.find(u => u.email === email && u.password === password);
+  if (!user) return toast("Email or password is incorrect.");
+  saveSession(user.id);
+  toast("Logged in.");
+  document.getElementById("loginForm").reset();
+  appStart();
 }
 
 function publishPost() {
-  const input = document.getElementById("postInput");
-  const raw = input.value.trim();
-  if (!raw) return toast("Write something first.");
+  const user = currentUser();
+  const title = document.getElementById("postTitle").value.trim();
+  const body = document.getElementById("postBody").value.trim();
+  const topic = document.getElementById("postTopic").value;
+  const rawTags = document.getElementById("postTags").value.trim();
 
-  state.posts.unshift({
+  if (!title) return toast("Add a title.");
+  if (body.length < 20) return toast("Write at least 20 characters.");
+  if (!user) return logout();
+
+  const tags = rawTags
+    .split(",")
+    .map(t => t.trim().replace(/^#/, "").toLowerCase())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  db.posts.unshift({
     id: crypto.randomUUID(),
-    author: "You",
-    handle: "@yourvoice",
-    location: "India",
-    time: "now",
-    category: "society",
-    tag: "Thought",
-    title: raw.split(/\n/)[0].slice(0, 80),
-    body: raw.split(/\n/).slice(1).join("\n") || raw,
-    hashtags: "#QAVRIN #YourVoice",
-    likes: 0, comments: 0, shares: 0, liked: false, saved: false,
-    avatar: "assets/avatar-you.svg"
+    userId: user.id,
+    name: user.name,
+    username: user.username,
+    title,
+    body,
+    topic,
+    tags,
+    createdAt: Date.now(),
+    likes: 0,
+    likedBy: [],
+    comments: []
+  });
+
+  saveDB();
+  document.getElementById("postTitle").value = "";
+  document.getElementById("postBody").value = "";
+  document.getElementById("postTags").value = "";
+  document.getElementById("charCount").textContent = "0 / 1200";
+  renderFeed();
+  toast("Your thought is live in this trial.");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function toggleLike(postId) {
+  const user = currentUser();
+  const post = db.posts.find(p => p.id === postId);
+  if (!user || !post) return;
+
+  const index = post.likedBy.indexOf(user.id);
+  if (index >= 0) {
+    post.likedBy.splice(index, 1);
+    post.likes = Math.max(0, post.likes - 1);
+  } else {
+    post.likedBy.push(user.id);
+    post.likes += 1;
+  }
+  saveDB();
+  renderFeed();
+}
+
+function toggleComments(card) {
+  card.querySelector(".comment-box")?.classList.toggle("open");
+}
+
+function addComment(postId, input) {
+  const user = currentUser();
+  const text = input.value.trim();
+  const post = db.posts.find(p => p.id === postId);
+  if (!user || !post || !text) return;
+
+  if (!Array.isArray(post.comments)) post.comments = [];
+  post.comments.push({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    name: user.name,
+    username: user.username,
+    text,
+    createdAt: Date.now()
   });
   input.value = "";
-  saveState();
+  saveDB();
   renderFeed();
-  toast("Posted to QAVRIN.");
-  window.scrollTo({top: document.getElementById("feed").offsetTop - 80, behavior: "smooth"});
+  toast("Comment added.");
 }
 
-function updateStats() {
-  const own = state.posts.filter(p => p.handle === "@yourvoice");
-  document.getElementById("statPosts").textContent = own.length;
-  document.getElementById("statLikes").textContent = own.reduce((n,p) => n + p.likes, 0);
-  document.getElementById("statComments").textContent = own.reduce((n,p) => n + p.comments, 0);
+function filteredPosts() {
+  const value = document.getElementById("feedFilter").value;
+  const user = currentUser();
+  let posts = [...db.posts];
+
+  if (value === "mine") posts = posts.filter(p => p.userId === user?.id);
+  else if (value === "popular") posts.sort((a,b) => b.likes - a.likes);
+  else if (value !== "latest") posts = posts.filter(p => p.topic === value);
+  else posts.sort((a,b) => b.createdAt - a.createdAt);
+
+  return posts;
 }
 
-document.getElementById("postBtn").addEventListener("click", publishPost);
-document.getElementById("floatingWrite").addEventListener("click", () => {
-  document.getElementById("postInput").focus();
-  window.scrollTo({top: 120, behavior: "smooth"});
-});
-document.getElementById("bottomCreate").addEventListener("click", () => document.getElementById("postInput").focus());
+function renderFeed() {
+  const user = currentUser();
+  const feed = document.getElementById("feed");
+  if (!user) return;
 
-document.querySelectorAll(".filter").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".filter").forEach(x => x.classList.remove("active"));
-    btn.classList.add("active");
-    activeFilter = btn.dataset.filter;
-    renderFeed();
-  });
-});
-
-document.querySelectorAll(".tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
-    btn.classList.add("active");
-    toast(btn.textContent + " feed selected.");
-  });
-});
-
-document.getElementById("feed").addEventListener("click", (event) => {
-  const action = event.target.closest("[data-action]");
-  if (!action) return;
-  const card = event.target.closest(".post-card");
-  const post = state.posts.find(p => p.id === card.dataset.id);
-  if (!post) return;
-
-  if (action.dataset.action === "like") {
-    post.liked = !post.liked;
-    post.likes += post.liked ? 1 : -1;
-  }
-  if (action.dataset.action === "save") post.saved = !post.saved;
-  if (action.dataset.action === "share") {
-    post.shares += 1;
-    navigator.clipboard?.writeText(window.location.href);
-    toast("Link copied.");
-  }
-  if (action.dataset.action === "comment") {
-    card.querySelector("[data-comment-box]").classList.toggle("open");
+  const posts = filteredPosts();
+  if (!posts.length) {
+    feed.innerHTML = `
+      <article class="post-card">
+        <strong>Nothing here yet.</strong>
+        <p class="muted">Start the conversation. Write something people can respond to.</p>
+      </article>`;
     return;
   }
-  if (action.dataset.action === "send-comment") {
-    const input = card.querySelector("input");
-    if (!input.value.trim()) return;
-    post.comments += 1;
-    input.value = "";
-    card.querySelector("[data-comment-box]").classList.remove("open");
-    toast("Comment added.");
-  }
-  saveState();
+
+  feed.innerHTML = posts.map(post => {
+    const liked = post.likedBy.includes(user.id);
+    const comments = Array.isArray(post.comments) ? post.comments : [];
+    const tags = post.tags?.length
+      ? `<div class="tags">${post.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join("")}</div>`
+      : "";
+
+    const commentHtml = comments.slice(-5).map(c => `
+      <div class="comment"><strong>${esc(c.name)}</strong> · @${esc(c.username)}<br>${esc(c.text)}</div>
+    `).join("");
+
+    return `
+      <article class="post-card" data-post-id="${post.id}">
+        <div class="post-meta">
+          <div class="author-line">
+            <span class="author-name">${esc(post.name)}</span>
+            <span class="author-handle">@${esc(post.username)} · ${timeAgo(post.createdAt)}</span>
+          </div>
+        </div>
+        <span class="topic-pill">${esc(post.topic)}</span>
+        <h3 class="post-title">${esc(post.title)}</h3>
+        <p class="post-body">${esc(post.body)}</p>
+        ${tags}
+        <div class="post-actions">
+          <button class="action ${liked ? "active" : ""}" data-action="like">♥ ${post.likes}</button>
+          <button class="action" data-action="comment">◯ ${comments.length}</button>
+          ${post.userId === user.id ? `<button class="action action-delete">Delete</button>` : ""}
+        </div>
+        <div class="comment-box">
+          <input maxlength="180" placeholder="Add your comment..." />
+          <button data-action="send-comment">Send</button>
+        </div>
+        ${commentHtml ? `<div class="comments">${commentHtml}</div>` : ""}
+      </article>`;
+  }).join("");
+}
+
+function deletePost(postId) {
+  const user = currentUser();
+  const post = db.posts.find(p => p.id === postId);
+  if (!post || post.userId !== user?.id) return;
+  db.posts = db.posts.filter(p => p.id !== postId);
+  saveDB();
   renderFeed();
+  toast("Post deleted.");
+}
+
+function openAccountModal() {
+  const user = currentUser();
+  if (!user) return;
+  const ownPosts = db.posts.filter(p => p.userId === user.id);
+  const ownLikes = ownPosts.reduce((sum,p) => sum + p.likes, 0);
+  document.getElementById("accountDetails").textContent = `${user.name} · @${user.username} · ${user.email}`;
+  document.getElementById("myPostCount").textContent = ownPosts.length;
+  document.getElementById("myLikeCount").textContent = ownLikes;
+  document.getElementById("accountModal").showModal();
+}
+
+document.querySelectorAll(".auth-tab").forEach(btn => {
+  btn.addEventListener("click", () => showAuth(btn.dataset.authTab));
+});
+document.getElementById("loginForm").addEventListener("submit", loginUser);
+document.getElementById("signupForm").addEventListener("submit", registerUser);
+
+document.getElementById("demoLogin").addEventListener("click", () => {
+  const demo = db.users.find(u => u.email === "demo@qavrin.in");
+  const user = demo || { id: crypto.randomUUID(), name: "Demo User", username: "demo_user", email: "demo@qavrin.in", password: "qavrin123", createdAt: Date.now() };
+  if (!demo) { db.users.push(user); saveDB(); }
+  saveSession(user.id);
+  appStart();
 });
 
-document.getElementById("profileBtn").addEventListener("click", () => {
-  updateStats();
-  document.getElementById("profileModal").showModal();
+document.getElementById("publishBtn").addEventListener("click", publishPost);
+document.getElementById("postBody").addEventListener("input", (e) => {
+  document.getElementById("charCount").textContent = `${e.target.value.length} / 1200`;
 });
-document.getElementById("notificationBtn").addEventListener("click", () => toast("No new notifications."));
+document.getElementById("feedFilter").addEventListener("change", renderFeed);
+document.getElementById("logoutBtn").addEventListener("click", logout);
+document.getElementById("newPostTop").addEventListener("click", () => {
+  document.getElementById("writer").scrollIntoView({behavior:"smooth"});
+  document.getElementById("postTitle").focus();
+});
+
+document.getElementById("feed").addEventListener("click", event => {
+  const card = event.target.closest(".post-card");
+  const postId = card?.dataset.postId;
+  if (!card || !postId) return;
+
+  if (event.target.closest('[data-action="like"]')) toggleLike(postId);
+  if (event.target.closest('[data-action="comment"]')) toggleComments(card);
+  if (event.target.closest('[data-action="send-comment"]')) {
+    const input = card.querySelector(".comment-box input");
+    addComment(postId, input);
+  }
+  if (event.target.closest(".action-delete")) deletePost(postId);
+});
+
 document.querySelectorAll("[data-close]").forEach(btn => {
   btn.addEventListener("click", () => document.getElementById(btn.dataset.close).close());
 });
-document.getElementById("clearLocalBtn").addEventListener("click", () => {
-  state = { posts: [...defaultPosts], comments: {} };
-  saveState();
-  renderFeed();
-  updateStats();
-  document.getElementById("profileModal").close();
-  toast("Demo data reset.");
-});
 
-document.querySelectorAll("[data-screen]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".bottom-item").forEach(x => x.classList.remove("active"));
-    btn.classList.add("active");
-    const screen = btn.dataset.screen;
-    if (screen === "home") window.scrollTo({top:0, behavior:"smooth"});
-    else toast(screen[0].toUpperCase() + screen.slice(1) + " is next in the build.");
-  });
-});
+// Triple-click the logo in the app to open a simple account panel during the trial.
+document.querySelector(".brand-logo").addEventListener("click", openAccountModal);
 
-renderVoices();
-renderFeed();
+appStart();

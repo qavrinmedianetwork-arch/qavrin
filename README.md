@@ -1,53 +1,134 @@
-# QAVRIN v1
+# QAVRIN V2 — Trial Build
 
-QAVRIN is a responsive front-end prototype for a youth-first social platform where Indian users can share thoughts, ideas, opinions and perspectives.
+This version replaces the original static demo with a simple account + writing flow.
 
-## What works in this version
+## What is included
 
-- Responsive feed UI based on the QAVRIN concept
-- Create a text post
-- Like / unlike posts
-- Save posts
-- Share (copies the page URL where browser permissions allow)
-- Add comments
-- Feed filters: Popular, Recent, Debates, Campus, Society
-- Profile modal with local stats
-- LocalStorage persistence
-- Mobile bottom navigation
-- GitHub Pages compatible — no build step required
+### Public entry
+- QAVRIN official logo supplied by the founder is used throughout the site.
+- Clear positioning: “Your thoughts deserve a place.”
+- Trial-version notice.
 
-## Run locally
+### Account flow
+- Create account with:
+  - Full name
+  - Username
+  - Email
+  - Password
+- Log in
+- Demo-account shortcut
+- Log out
+- Basic account summary
 
-Open `index.html` directly in a browser, or use a small local server:
+### Writing flow
+- Create a post
+- Title
+- Long-form body
+- Topic
+- Tags
+- Character counter
+- Publish
+- Delete your own post
 
-```bash
-python -m http.server 8000
-```
+### Community flow
+- Latest feed
+- Popular feed
+- My posts
+- Topic filtering
+- Likes
+- Comments
+- Simple comment list
 
-Then open `http://localhost:8000`.
+### Design choice
+No avatar system is included in this trial, as requested. The product identity is based on name, username and writing.
 
-## Deploy on GitHub Pages
+## IMPORTANT: this is still a browser-only trial
 
-1. Create a new GitHub repository, e.g. `qavrin`.
-2. Upload all files and folders from this project.
-3. In GitHub: **Settings → Pages**.
-4. Choose **Deploy from a branch**.
-5. Select `main` and `/ (root)`.
-6. Save. GitHub will give you the public site URL.
+GitHub Pages is static hosting. It cannot safely provide real shared authentication and a shared database by itself.
 
-## Important
+In this build:
+- users are stored in the browser's localStorage
+- passwords are stored locally in plain text
+- posts exist only in that browser
+- another person on another phone/browser will NOT see the same accounts or posts
 
-This is a front-end demo. It does **not** yet have real user accounts, a real database, server-side moderation, image uploads, or production authentication.
+This is deliberate for the trail/trial demonstration, but it is NOT suitable for production.
 
-For the real QAVRIN app, the next technical stage should add:
+## What the next real version needs
 
-- Supabase/PostgreSQL database
-- Authentication
-- Real profiles and follows
-- Server-side posts/comments/likes
-- Image/video storage
-- Moderation and reporting
-- Search
-- Admin dashboard
-- Rate limits and anti-spam
-- Production deployment
+Move the application backend to a real service such as Supabase and connect:
+
+1. Authentication
+2. PostgreSQL database
+3. Server-side authorization
+4. Real user profiles
+5. Posts table
+6. Comments table
+7. Likes table
+8. Follows table
+9. Reports / moderation
+10. Image/video storage later
+11. Rate limiting and anti-spam
+12. Privacy policy, terms and community rules
+
+### Suggested database structure
+
+users / profiles
+- id
+- full_name
+- username
+- email
+- created_at
+
+posts
+- id
+- user_id
+- title
+- body
+- topic
+- created_at
+- updated_at
+
+comments
+- id
+- post_id
+- user_id
+- body
+- created_at
+
+likes
+- post_id
+- user_id
+- created_at
+
+## GitHub Pages deployment
+
+Upload the project contents to the `qavrin` repository.
+
+Then:
+
+GitHub → Repository → Settings → Pages
+
+Choose:
+
+- Source: Deploy from a branch
+- Branch: main
+- Folder: / (root)
+
+Save and wait for the Pages deployment.
+
+## Suggested launch sequence
+
+Do not add payments or ads yet.
+
+First test:
+- 10–20 people
+- 2–4 weeks
+- number of account creations
+- number of posts
+- posts per active user
+- comments per post
+- return users
+- reports / spam
+
+Only after people are actually using it should the production backend and monetisation work begin.
