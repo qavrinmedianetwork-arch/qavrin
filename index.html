@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QAVRIN — Your thoughts deserve a place.</title>
+  <meta name="description" content="QAVRIN — a space for Indian youth to share thoughts, ideas, opinions and perspectives." />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <img src="assets/qavrin-mark.svg" class="brand-mark" alt="QAVRIN" />
+        <span>QAVRIN</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" aria-label="Notifications" id="notificationBtn">♧</button>
+        <button class="profile-mini" id="profileBtn" aria-label="Open profile">
+          <img src="assets/avatar-you.svg" alt="" />
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">A NEW SPACE. REAL THOUGHTS. YOUNG VOICES.</p>
+          <h1>Your thoughts<br /><span>deserve a place.</span></h1>
+          <p class="hero-copy">
+            A space for Indian youth to share thoughts, ideas, opinions and perspectives.
+          </p>
+        </div>
+        <div class="hero-quote">“</div>
+      </section>
+
+      <nav class="tabs" aria-label="Feed">
+        <button class="tab active" data-tab="for-you">For You</button>
+        <button class="tab" data-tab="following">Following</button>
+        <button class="tab" data-tab="explore">Explore</button>
+      </nav>
+
+      <section class="composer-card">
+        <div class="composer-row">
+          <img class="avatar" src="assets/avatar-you.svg" alt="" />
+          <textarea id="postInput" maxlength="500" placeholder="What's on your mind?"></textarea>
+          <button class="primary-btn" id="postBtn">Post</button>
+        </div>
+        <div class="composer-tools">
+          <button data-type="thought">💬 Thought</button>
+          <button data-type="poll">▥ Poll</button>
+          <button data-type="image">▧ Image</button>
+          <button data-type="video">▷ Video</button>
+        </div>
+      </section>
+
+      <section class="voices">
+        <div class="section-head">
+          <h2>Voices around you</h2>
+          <button class="text-btn">See all</button>
+        </div>
+        <div class="voice-row" id="voiceRow"></div>
+      </section>
+
+      <section class="filters" id="filters">
+        <button class="filter active" data-filter="popular">↗ Popular</button>
+        <button class="filter" data-filter="recent">◷ Recent</button>
+        <button class="filter" data-filter="debates">☷ Debates</button>
+        <button class="filter" data-filter="campus">⌂ Campus</button>
+        <button class="filter" data-filter="society">♧ Society</button>
+      </section>
+
+      <section id="feed" class="feed" aria-live="polite"></section>
+    </main>
+
+    <button class="floating-write" id="floatingWrite" aria-label="Write a post">✎ <span>Write</span></button>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="bottom-item active" data-screen="home"><span>⌂</span><small>Home</small></button>
+      <button class="bottom-item" data-screen="discover"><span>◈</span><small>Discover</small></button>
+      <button class="bottom-item create" id="bottomCreate"><span>Q</span><small>Create</small></button>
+      <button class="bottom-item" data-screen="notifications"><span>♧</span><small>Notifications</small></button>
+      <button class="bottom-item" data-screen="profile"><span>◯</span><small>Profile</small></button>
+    </nav>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <dialog class="modal" id="profileModal">
+    <div class="modal-card">
+      <button class="modal-close" data-close="profileModal">×</button>
+      <img class="modal-avatar" src="assets/avatar-you.svg" alt="" />
+      <h2>Your QAVRIN profile</h2>
+      <p class="muted">@yourvoice</p>
+      <div class="profile-stats">
+        <div><strong id="statPosts">0</strong><span>Posts</span></div>
+        <div><strong id="statLikes">0</strong><span>Likes</span></div>
+        <div><strong id="statComments">0</strong><span>Comments</span></div>
+      </div>
+      <button class="primary-btn full" id="clearLocalBtn">Reset local demo data</button>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
