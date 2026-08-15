@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<noscript><div style="padding:24px;font-family:system-ui">QAVRIN needs JavaScript enabled.</div></noscript>
+
 <div id="mobileBar"><button id="menuBtn">☰</button><img src="assets/qavrin-logo.png" alt="QAVRIN"><button id="openSearch">⌕</button></div>
 <div class="layout">
 <aside id="sidebar">
@@ -74,6 +76,6 @@
 
 <div id="editModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="editModal">×</button><h2>Edit profile</h2><form id="editForm" class="form"><label>Name<input id="editName" required></label><label>Bio<textarea id="editBio" maxlength="160"></textarea></label><button class="primary">Save changes</button></form></div></div>
 <div id="toast" class="toast hidden"></div>
-<script src="app.js"></script>
+<script>window.addEventListener("error",function(){var e=document.getElementById("toast");if(e){e.textContent="QAVRIN could not load this page. Please refresh.";e.classList.remove("hidden");}});</script><script src="app.js"></script>
 </body>
 </html>
