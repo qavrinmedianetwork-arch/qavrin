@@ -1,6 +1,0 @@
-create extension if not exists pgcrypto;
-create table if not exists public.profiles(id uuid primary key references auth.users(id) on delete cascade,username text unique not null,full_name text not null,bio text default '',created_at timestamptz default now());
-create table if not exists public.posts(id uuid primary key default gen_random_uuid(),user_id uuid references public.profiles(id) on delete cascade,title text not null,body text not null,topic text not null default 'General',tags text[] default '{}',created_at timestamptz default now());
-create table if not exists public.comments(id uuid primary key default gen_random_uuid(),post_id uuid references public.posts(id) on delete cascade,user_id uuid references public.profiles(id) on delete cascade,body text not null,created_at timestamptz default now());
-create table if not exists public.likes(post_id uuid references public.posts(id) on delete cascade,user_id uuid references public.profiles(id) on delete cascade,primary key(post_id,user_id));
-create table if not exists public.follows(follower_id uuid references public.profiles(id) on delete cascade,following_id uuid references public.profiles(id) on delete cascade,primary key(follower_id,following_id));
